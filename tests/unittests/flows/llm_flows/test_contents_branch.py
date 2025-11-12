@@ -15,7 +15,7 @@
 """Tests for branch filtering in contents module.
 
 Branch format: agent_1.agent_2.agent_3 (parent.child.grandchild)
-Agents can see events that happened earlier in their their own branch/sub-branch. But not sibling branches.
+Agents can see events from their own branch, as well as ancestor and descendant branches, but not sibling branches.
 """
 
 from google.adk.agents.llm_agent import Agent
