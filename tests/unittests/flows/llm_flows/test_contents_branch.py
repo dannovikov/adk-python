@@ -15,7 +15,7 @@
 """Tests for branch filtering in contents module.
 
 Branch format: agent_1.agent_2.agent_3 (parent.child.grandchild)
-Child agents can see parent agents' events, but not sibling agents' events.
+Agents can see events that happened earlier in their their own branch/sub-branch. But not sibling branches.
 """
 
 from google.adk.agents.llm_agent import Agent
@@ -29,8 +29,8 @@ from ... import testing_utils
 
 
 @pytest.mark.asyncio
-async def test_branch_filtering_child_sees_parent():
-  """Test that child agents can see parent agents' events."""
+async def test_branch_filtering_child_sees_events_from_earlier_in_same_branch():
+  """Test that child agents can see events from earlier in their own branch."""
   agent = Agent(model="gemini-2.5-flash", name="child_agent")
   llm_request = LlmRequest(model="gemini-2.5-flash")
   invocation_context = await testing_utils.create_invocation_context(
@@ -68,17 +68,24 @@ async def test_branch_filtering_child_sees_parent():
           invocation_id="inv5",
           author="child_agent",
           content=types.ModelContent("Excluded response 2"),
-          branch="parent_agent.child",  # Prefix match BUT not itself/ancestor - should be excluded
+          branch="parent_agent.child",  # Prefix doesn't match - should be excluded
       ),
+      Event(
+        invocation_id="inv6",
+        author="grandchild_agent",
+        content=types.ModelContent("Grandchild agent response"),
+        branch="parent_agent.child_agent.grandchild_agent",  # Grandchild - should be included
+      )
   ]
   invocation_context.session.events = events
 
   # Process the request
   async for _ in request_processor.run_async(invocation_context, llm_request):
     pass
+  
 
-  # Verify child can see user message and parent events, but not sibling events
-  assert len(llm_request.contents) == 3
+  # Verify child can see user message, parent events, own events, and grandchild events
+  assert len(llm_request.contents) == 4
   assert llm_request.contents[0] == types.UserContent("User message")
   assert llm_request.contents[1].role == "user"
   assert llm_request.contents[1].parts == [
@@ -86,6 +93,11 @@ async def test_branch_filtering_child_sees_parent():
       types.Part(text="[parent_agent] said: Parent agent response"),
   ]
   assert llm_request.contents[2] == types.ModelContent("Child agent response")
+  assert llm_request.contents[3].role == "user"
+  assert llm_request.contents[3].parts == [
+      types.Part(text="For context:"),
+      types.Part(text="[grandchild_agent] said: Grandchild agent response"),
+  ]
 
 
 @pytest.mark.asyncio
@@ -251,8 +263,8 @@ async def test_branch_filtering_grandchild_sees_grandparent():
 
 
 @pytest.mark.asyncio
-async def test_branch_filtering_parent_cannot_see_child():
-  """Test that parent agents cannot see child agents' events."""
+async def test_branch_filtering_parent_can_see_child():
+  """Test that parent agents CAN see events from sub-branches."""
   agent = Agent(model="gemini-2.5-flash", name="parent_agent")
   llm_request = LlmRequest(model="gemini-2.5-flash")
   invocation_context = await testing_utils.create_invocation_context(
@@ -293,8 +305,18 @@ async def test_branch_filtering_parent_cannot_see_child():
   async for _ in request_processor.run_async(invocation_context, llm_request):
     pass
 
-  # Verify parent cannot see child or grandchild events
-  assert llm_request.contents == [
-      types.UserContent("User message"),
-      types.ModelContent("Parent response"),
+  # Verify parent CAN see child and grandchild events
+  assert len(llm_request.contents) == 4
+  assert llm_request.contents[0] == types.UserContent("User message")
+  assert llm_request.contents[1] == types.ModelContent("Parent response")
+  # Child and grandchild events are reformatted as user context
+  assert llm_request.contents[2].role == "user"
+  assert llm_request.contents[2].parts == [
+      types.Part(text="For context:"),
+      types.Part(text="[child_agent] said: Child response"),
+  ]
+  assert llm_request.contents[3].role == "user"
+  assert llm_request.contents[3].parts == [
+      types.Part(text="For context:"),
+      types.Part(text="[grandchild_agent] said: Grandchild response"),
   ]
