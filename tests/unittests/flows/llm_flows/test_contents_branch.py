@@ -29,8 +29,8 @@ from ... import testing_utils
 
 
 @pytest.mark.asyncio
-async def test_branch_filtering_child_sees_events_from_earlier_in_same_branch():
-  """Test that child agents can see events from earlier in their own branch."""
+async def test_branch_filtering_agent_sees_ancestors_and_descendants():
+  """Test that an agent can see events from its ancestors and descendants."""
   agent = Agent(model="gemini-2.5-flash", name="child_agent")
   llm_request = LlmRequest(model="gemini-2.5-flash")
   invocation_context = await testing_utils.create_invocation_context(
