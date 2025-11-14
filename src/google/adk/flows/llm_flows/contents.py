@@ -628,7 +628,6 @@ def _is_event_belongs_to_branch(
   )
 
 
-
 def _is_function_call_event(event: Event, function_name: str) -> bool:
   """Checks if an event is a function call/response for a given function name."""
   if not event.content or not event.content.parts:
