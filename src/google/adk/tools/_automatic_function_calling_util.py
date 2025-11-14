@@ -297,7 +297,11 @@ def from_function_with_options(
 
   parameters_properties = {}
   parameters_json_schema = {}
-  annotation_under_future = typing.get_type_hints(func)
+  try:
+    annotation_under_future = typing.get_type_hints(func)
+  except TypeError:
+    # This can happen if func is a mock object
+    annotation_under_future = {}
   try:
     for name, param in inspect.signature(func).parameters.items():
       if param.kind in (
