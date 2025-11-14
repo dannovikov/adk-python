@@ -71,18 +71,17 @@ async def test_branch_filtering_agent_sees_ancestors_and_descendants():
           branch="parent_agent.child",  # Prefix doesn't match - should be excluded
       ),
       Event(
-        invocation_id="inv6",
-        author="grandchild_agent",
-        content=types.ModelContent("Grandchild agent response"),
-        branch="parent_agent.child_agent.grandchild_agent",  # Grandchild - should be included
-      )
+          invocation_id="inv6",
+          author="grandchild_agent",
+          content=types.ModelContent("Grandchild agent response"),
+          branch="parent_agent.child_agent.grandchild_agent",  # Grandchild - should be included
+      ),
   ]
   invocation_context.session.events = events
 
   # Process the request
   async for _ in request_processor.run_async(invocation_context, llm_request):
     pass
-  
 
   # Verify child can see user message, parent events, own events, and grandchild events
   assert len(llm_request.contents) == 4
