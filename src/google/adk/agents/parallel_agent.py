@@ -173,9 +173,11 @@ class ParallelAgent(BaseAgent):
       yield self._create_agent_state_event(ctx)
 
     agent_runs = []
+    sub_agent_contexts = []
     # Prepare and collect async generators for each sub-agent.
     for sub_agent in self.sub_agents:
       sub_agent_ctx = _create_branch_ctx_for_sub_agent(self, sub_agent, ctx)
+      sub_agent_contexts.append(sub_agent_ctx)
 
       # Only include sub-agents that haven't finished in a previous run.
       if not sub_agent_ctx.end_of_agents.get(sub_agent.name):
@@ -196,6 +198,31 @@ class ParallelAgent(BaseAgent):
 
       if pause_invocation:
         return
+
+      # MINIMAL FIX: Merge branch contexts by finding common prefix
+      # This allows downstream agents to see events from all parallel branches
+      if sub_agent_contexts:
+        child_branches = [sac.branch for sac in sub_agent_contexts if sac.branch]
+        if child_branches:
+          # Find common prefix of all child branches
+          common_prefix = child_branches[0]
+          for branch in child_branches[1:]:
+            # Find where they diverge
+            min_len = min(len(common_prefix), len(branch))
+            for i in range(min_len):
+              if common_prefix[i] != branch[i]:
+                common_prefix = common_prefix[:i]
+                break
+            else:
+              # One is prefix of the other
+              common_prefix = common_prefix[:min_len]
+          
+          # Remove trailing dot if present
+          common_prefix = common_prefix.rstrip('.')
+          
+          # Update parent context to use the common prefix
+          # This makes downstream agents able to see all parallel events
+          ctx.branch = common_prefix
 
       # Once all sub-agents are done, mark the ParallelAgent as final.
       if ctx.is_resumable and all(

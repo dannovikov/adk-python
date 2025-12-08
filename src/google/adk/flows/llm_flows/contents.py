@@ -623,15 +623,23 @@ def _is_event_belongs_to_branch(
 
   This is for event context segregation between agents. E.g. agent A shouldn't
   see output of agent B.
+  
+  MINIMAL FIX: Also check if event branch starts with invocation branch.
+  This allows agents to see events from child branches (e.g., after parallel join).
   """
   if not invocation_branch or not event.branch:
     return True
-  # We use dot to delimit branch nodes. To avoid simple prefix match
-  # (e.g. agent_0 unexpectedly matching agent_00), require either perfect branch
-  # match, or match prefix with an additional explicit '.'
-  return invocation_branch == event.branch or invocation_branch.startswith(
+  # Original logic: can see parent branch events
+  # (e.g. "root.parallel.A" can see events from "root.parallel")
+  if invocation_branch == event.branch or invocation_branch.startswith(
       f'{event.branch}.'
-  )
+  ):
+    return True
+  # NEW: can also see child branch events
+  # (e.g. "root.parallel" can see events from "root.parallel.A")
+  if event.branch.startswith(f'{invocation_branch}.'):
+    return True
+  return False
 
 
 def _is_function_call_event(event: Event, function_name: str) -> bool:
